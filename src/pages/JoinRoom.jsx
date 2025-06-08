@@ -5,42 +5,65 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Key, Mail, Shield } from 'lucide-react';
+import { roomAPI, authAPI } from '@/services/api';
+import { useNavigate } from 'react-router-dom';
+import { toast } from '@/components/ui/sonner';
 
 const JoinRoom = () => {
-  const [step, setStep] = useState<'accessKey' | 'email' | 'otp'>('accessKey');
+  const navigate = useNavigate();
+  const [step, setStep] = useState('accessKey');
   const [accessKey, setAccessKey] = useState('');
   const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
+  const [roomData, setRoomData] = useState(null);
 
-  const handleAccessKeySubmit = async (e: React.FormEvent) => {
+  const handleAccessKeySubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    // Simulate access key validation
-    setTimeout(() => {
-      setLoading(false);
+    
+    try {
+      const response = await roomAPI.check({ access_key: accessKey });
+      setRoomData(response.data);
+      toast.success('Access key validated successfully');
       setStep('email');
-    }, 1000);
+    } catch (error) {
+      console.error('Access key validation failed:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEmailSubmit = async (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    // Simulate email verification
-    setTimeout(() => {
-      setLoading(false);
+    
+    try {
+      await authAPI.register({ name, email });
+      toast.success('Verification code sent to your email');
       setStep('otp');
-    }, 1000);
+    } catch (error) {
+      console.error('Registration failed:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleOtpSubmit = async (e: React.FormEvent) => {
+  const handleOtpSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    // Simulate OTP verification and join room
-    setTimeout(() => {
+    
+    try {
+      await authAPI.verifyOTP({ otp });
+      const joinResponse = await roomAPI.join({ access_key: accessKey });
+      toast.success('Successfully joined the room');
+      navigate(`/chat-room/${joinResponse.data.room_id}?participant=true`);
+    } catch (error) {
+      console.error('OTP verification or room join failed:', error);
+    } finally {
       setLoading(false);
-      window.location.href = '/chat-room/abc123?participant=true';
-    }, 1000);
+    }
   };
 
   const getStepIcon = () => {
@@ -54,7 +77,7 @@ const JoinRoom = () => {
   const getStepTitle = () => {
     switch (step) {
       case 'accessKey': return 'Enter Access Key';
-      case 'email': return 'Enter Your Email';
+      case 'email': return 'Enter Your Details';
       case 'otp': return 'Verify OTP';
     }
   };
@@ -71,7 +94,7 @@ const JoinRoom = () => {
     <div className="min-h-screen bg-gradient-to-br from-green-900 via-blue-900 to-purple-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <Button 
-          onClick={() => window.history.back()}
+          onClick={() => navigate('/')}
           variant="ghost" 
           className="text-white hover:bg-white/20 mb-6"
         >
@@ -121,6 +144,19 @@ const JoinRoom = () => {
             {step === 'email' && (
               <form onSubmit={handleEmailSubmit} className="space-y-6">
                 <div>
+                  <Label htmlFor="name" className="text-gray-700">Full Name</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Enter your full name"
+                    required
+                    className="mt-2 border-gray-300 focus:border-green-500 focus:ring-green-500"
+                  />
+                </div>
+                
+                <div>
                   <Label htmlFor="email" className="text-gray-700">Email Address</Label>
                   <Input
                     id="email"
@@ -135,7 +171,7 @@ const JoinRoom = () => {
                 
                 <Button 
                   type="submit" 
-                  disabled={loading || !email}
+                  disabled={loading || !email || !name}
                   className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white py-3 rounded-lg transition-all duration-200"
                 >
                   {loading ? 'Sending...' : 'Send Verification Code'}
